@@ -4,7 +4,11 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption");
+// const encrypt = require("mongoose-encryption");
+// const md5 = require("md5");
+// const bcrypt = require("bcrypt");
+// const saltRounds = 10;
+
 
 const app = express();
 
@@ -20,9 +24,9 @@ const userSchema = new mongoose.Schema( {
 });
 
 // Schema change ya ml 
-const secret = process.env.secret;
+// const secret = process.env.secret;
 
-userSchema.plugin(encrypt, {secret: secret, encryptedFields: ["password"]});
+// userSchema.plugin(encrypt, {secret: secret, encryptedFields: ["password"]});
 
 const User = new mongoose.model("User", userSchema);
 
@@ -39,36 +43,52 @@ app.get("/register", function(req, res) {
 //     res.render("secrets");
 // });
 app.post("/register", function (req, res ){
-    const newUser = new User({
-        email: req.body.username,
-        password: req.body.password
+
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+        // Store hash in your password DB.
+        const newUser = new User({
+            email: req.body.username,
+            password: hash
+        });
+        try {
+            newUser.save();
+            res.render("secrets");
+        } catch (error) {
+            console.log(error);
+        }
     });
-    try {
-        newUser.save();
-        res.render("secrets");
-    } catch (error) {
-        console.log(error);
-    }
+
 })
 
 app.post("/login",async function(req, res){
     const username = req.body.username;
-    const passwordH = req.body.password;
+    const password = req.body.password;
 
     try{
-        const user =await User.findOne({email: username});
+        const user = await User.findOne({email: username});
+        // console.log("Down here");
         if(user){
-            const result = req.body.password === user.password;
-            if(result){
-                res.render("secrets");
-            }else{
-                res.status(400).json({error: "Password doesn't match!!!"});
-            }
+            // console.log("Inside user check");
+            bcrypt.compare(password, user.password, function(err, result) {
+                if(result===true){
+                    // console.log("This is inside hash check");
+                    res.render("secrets");
+                }
+                else{
+                    res.status(400).json({error: "Password doesn't match!!!"});
+                }
+            })
+            // const result = md5(req.body.password) === user.password;
+            // if(result){
+            //     res.render("secrets");
+            // }else{
+            //     res.status(400).json({error: "Password doesn't match!!!"});
+            // }
         }else{
             res.status(400).json({error: "User doesn't exist!!!"});
         }
     }catch(err){
-        res.status(400).json({error});
+        res.status(400).json({error: "Something went wrong!!!"});
     }
     
 
